@@ -1,0 +1,124 @@
+---
+title: "CaseStudy1 - A comparison of Education and GDP Data from the World Bank"
+author: "Brian Coari, Annahid Lee, Lisa Street"
+date: "October 19, 2017"
+output:
+  html_document: 
+  keep_md: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Case Study 1: GDP AND EDU DATA
+
+###The following code analyzes two datasets provided by the World Bank. The first is the GDP data for 190 ranked countries. This dataset presents a comparison of how individual countries are ranked against other countries throughout the world. The second is Educational data for countries throughout the world.  This dataset also splits countries into assigned income groups. For effective analysis of GDP and Income data, the two data sets were merged together by country code to allow for further exploratory analysis as defined below. 
+
+###Download packages and data
+```{r header}
+#download the files to csv
+
+library(downloader)
+download("https://d396qusza40orc.cloudfront.net/getdata%2Fdata%2FGDP.csv", destfile="GDP.csv")
+download("https://d396qusza40orc.cloudfront.net/getdata%2Fdata%2FEDSTATS_Country.csv", destfile="EducData.csv")
+```
+
+
+###Data Cleanup
+```{r cleanup}
+####*Data cleanup section:*
+#read csv files
+gdpraw <- read.csv("GDP.csv")
+eduraw <- read.csv("EducData.csv")
+
+
+#select columns 1, 2, 4 and 5 from gdpraw and assign column names
+edudata <- eduraw
+gdpdata = gdpraw[,c(1,2,4,5)]
+names(gdpdata) <- c("countrycode", "ranking", "countryname", "gdp")
+
+#Cleanup for gdp and edu data to omit null or empty country codes
+gdpclean <- gdpdata[!is.null(gdpdata$countrycode),]
+educlean <- edudata[!is.null(edudata$CountryCode),]
+gdpclean <- gdpclean[-which(gdpclean$countrycode==""),]
+gdpclean <- gdpclean[-which(gdpclean$ranking==""),]
+
+#assign ranking with string to int
+gdpclean$ranking <- strtoi(gdpclean$ranking)
+
+
+#merge data toghether by country code
+MergedData <- merge(gdpclean, educlean, by=1)
+```
+
+###Case Study Questions and Answers
+
+###Question 1:
+```{r Question 1}
+
+##Case Study Questions and Answers
+
+#1 Find he number of matching country codes
+#  Number of records that match
+length(MergedData$countrycode)
+```
+####*Answer to Question 1: There are 189 country codes that match between the 2 files.*
+
+###Question 2:
+```{r Question 2}
+#2  Sort the data frame ascending by GDP and find the 13th country
+# 	Cast GDP as number and remove commas, then order by GDP to find the thirteenth position 
+MergedData$GDPNUM <- as.numeric(gsub(",","", MergedData$gdp))
+sortOrder <- MergedData[order(MergedData$GDPNUM),]
+#sortOrder[13, "Short.Name"]
+```
+####*Answer to question 2: St. Kitts and Nevis is the 13th country after sorting by GDP ascending.*
+
+###Question 3:
+```{r Question 3}
+#3 Find the average GDP rankings of the High Income OECD and High Income Non OECD groups
+#	 Assigne the groups and get the means
+highIncome <- MergedData[MergedData$Income.Group == 'High income: OECD',]
+nonHighIncome <- MergedData[MergedData$Income.Group == 'High income: nonOECD',]
+
+mean(highIncome$ranking)
+
+mean(nonHighIncome$ranking)
+```
+####*Answer to quesiton 3: Average for High Income OECD: 32.96667 and average for High Income Non OECD: 91.91304.*
+
+###Question 4:
+#####Now we look at plots for GDP by country code and color filled by Income Group, and GDP by Income Group
+```{r gg, echo=FALSE}
+
+#4 Plot the GDP for all the countries
+#Plot 1: GDP by country code and color filled by Income Group
+library(ggplot2) 
+
+MergedData$gdp2 <- as.numeric(gsub(",", "", MergedData$gdp))
+GdpPlot <- ggplot(MergedData, aes(x=countrycode, 
+																					 y=gdp2, colour=Income.Group)) 
+print(GdpPlot + geom_point() + scale_y_continuous(trans='log2') 
+			+ theme(axis.text.x = element_text(angle = 90, hjust = 1)))
+
+
+#Plote 2: GDP by Income Group
+ggplot(MergedData, aes(y = gdp2, x=Income.Group,fill=Income.Group)) + scale_y_log10()+ geom_point(pch = 21, size = 8, stat = "identity", 
+position=position_jitter())+ scale_fill_manual(values = c("red", "orange", "green", "blue","brown"), 
+na.value = "grey50" ) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+###Question 5:
+#####Now we build a table to look at the GDP rankings in 5 different quantiles.
+```{r Question 5}
+#Cut the GDP rankings into 5 seperate quantile groups
+#Determine the quantiles 
+MergedData$quantile <- cut(MergedData$ranking, breaks = 5)
+table(MergedData$quantile, MergedData$Income.Group)
+tblData <- MergedData[MergedData$Income.Group == "Lower middle income" & MergedData$ranking <= 38,]
+tblData["Short.Name"]
+```
+
+###Conclusion: Through the merging of the datasets, we were able to answer the following questions.  One, there are 189 matching country codes between the two datasets.  Two, the 13th country sorted by GDP ascending is St. Kitts and Nevis. Three, the average ranking for the countries assigned an income group of 'High Income: OECD' is 32.96667 and for the income group of 'High Income: nonOECD' is 91.91304. Plotting shows that the majority of our coutries fall into a Lower Middle income (blue) or low income (green) income group.  Finally, our quantile comparison shows 5 countries that have a Lower Middle income but fall into one of the 38 counties with the highest GDP, and they are China, Egypt, Indonesia, India and Thailand.
